@@ -95,3 +95,21 @@ def test_annotation_feature_lookup():
     assert len(features_by_type(feats, "gene")) == 1
     assert len(features_in_range(feats, start=1, end=200, seqid="chr1")) == 2
     assert len(feature_children(feats, "g1")) == 1
+
+
+import pytest
+
+
+@pytest.mark.asyncio
+async def test_tp53_golden_path_workflow():
+    from nexus.workflows.analyze import AnalyzeBiomedicalEntityWorkflow
+
+    workflow = AnalyzeBiomedicalEntityWorkflow()
+    context = await workflow.run_context("TP53")
+
+    assert context.query == "TP53"
+    assert context.subject is not None
+    assert context.graph is not None
+    assert context.report is not None
+    assert context.report.scientific_confidence is not None
+    assert len(context.entities) > 0

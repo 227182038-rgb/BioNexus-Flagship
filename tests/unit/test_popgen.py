@@ -48,6 +48,38 @@ def test_hardy_weinberg_returns_p_in_range():
     assert 0.0 <= p <= 1.0
 
 
+def test_hardy_weinberg_df_biallelic_regression():
+    """Regression for lead L-09: df must be k(k-1)/2 = 1 for a biallelic locus.
+
+    Derivation: k alleles give k(k+1)/2 genotype classes; allele frequencies
+    estimated from the same sample consume (k-1) free parameters, so
+    df = k(k+1)/2 - 1 - (k-1) = k(k-1)/2.
+    """
+    from scipy import stats as scipy_stats
+
+    genotypes = [
+        ("A", "A"), ("A", "T"), ("A", "T"), ("T", "T"), ("A", "A"),
+        ("A", "T"), ("A", "A"), ("A", "A"), ("T", "T"), ("A", "T"),
+    ]
+    chi2, p = hardy_weinberg_test(genotypes)
+    expected_p = float(scipy_stats.chi2.sf(chi2, 1))
+    assert p == pytest.approx(expected_p, abs=1e-9)
+
+
+def test_hardy_weinberg_df_multiallelic_regression():
+    """Regression for lead L-09: df must be k(k-1)/2 = 3 for k = 3 alleles."""
+    from scipy import stats as scipy_stats
+
+    genotypes = [
+        ("A", "A"), ("A", "C"), ("C", "G"), ("G", "G"), ("A", "G"),
+        ("C", "C"), ("A", "C"), ("C", "G"), ("G", "A"), ("A", "A"),
+        ("C", "C"), ("A", "G"),
+    ]
+    chi2, p = hardy_weinberg_test(genotypes)
+    expected_p = float(scipy_stats.chi2.sf(chi2, 3))
+    assert p == pytest.approx(expected_p, abs=1e-9)
+
+
 def test_fst_two_pops():
     pop1 = [("A", "A"), ("A", "a"), ("a", "a")]
     pop2 = [("A", "A"), ("A", "A"), ("A", "a")]

@@ -215,9 +215,9 @@ def _register_commands() -> None:
     if typer is None or app is None:
         return
     # Top-level
-    app.command()(_version)
-    app.command()(_programs)
-    app.command()(_run)
+    app.command("version")(_version)
+    app.command("programs")(_programs)
+    app.command("run")(_run)
     # BioKit sub-app
     biokit_app.command("gc")(_biokit_gc)
     biokit_app.command("orfs")(_biokit_orfs)

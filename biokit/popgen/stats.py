@@ -44,8 +44,17 @@ def hardy_weinberg_test(genotypes: Iterable[Genotype]) -> tuple[float, float]:
     if not expected:
         return 0.0, 1.0
     chi2 = sum((o - e) ** 2 / e for o, e in zip(obs_list, expected, strict=False))
-    df = max(len(expected) - 1, 1)
-    p = 1.0 - stats.chi2.cdf(chi2, df)
+    # Degrees of freedom for HWE: with k alleles there are k(k+1)/2 unordered
+    # genotype classes, and estimating the k allele frequencies from the same
+    # sample consumes k-1 free parameters (they are constrained to sum to 1):
+    #   df = k(k+1)/2 - 1 - (k-1) = k(k-1)/2
+    # (1 for a biallelic locus).  This is the asymptotic chi-square
+    # approximation; when many expected counts are small (commonly < 5),
+    # an exact test is preferable and this p-value should be treated with
+    # caution.
+    k = len(alleles)
+    df = max(k * (k - 1) // 2, 1)
+    p = float(stats.chi2.sf(chi2, df))
     return float(chi2), float(p)
 
 

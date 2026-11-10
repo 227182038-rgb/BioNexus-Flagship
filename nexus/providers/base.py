@@ -110,6 +110,13 @@ class BaseLLMProvider(abc.ABC):
     The base class handles timing, error wrapping, and the ``name``
     attribute. Subclasses set ``name`` and ``model`` as class attributes
     or instance attributes.
+
+    Spend and retry policy — NOT IMPLEMENTED here (by design, documented):
+    Nexus performs exactly ONE call per invocation; there is no automatic
+    retry, no budget counter, and no spend cap enforced in code.  Cost
+    control must be applied at the provider account level (e.g. OpenAI /
+    Anthropic monthly hard limits) by the deployment owner, and via
+    request-level ``max_tokens``/``timeout`` arguments above.
     """
 
     name: str = "base"

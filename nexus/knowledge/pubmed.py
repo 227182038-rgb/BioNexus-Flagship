@@ -1,10 +1,11 @@
-﻿"""PubMed client (via NCBI E-utilities)."""
+"""PubMed client (via NCBI E-utilities)."""
 
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 
 from nexus.knowledge.base import KnowledgeClient, KnowledgeError, KnowledgeRecord, KnowledgeSource
+from nexus.core.exceptions import PubMedError
 
 
 class PubMedClient(KnowledgeClient):
@@ -27,11 +28,16 @@ class PubMedClient(KnowledgeClient):
                 },
             )
         except Exception as exc:
-            raise KnowledgeError(
+            raise PubMedError(
                 f"PubMed fetch failed for {record_id}: {exc}"
             ) from exc
 
-        return self._parse_xml(response.text, record_id)
+        records = self._parse_articles(response.text)
+
+        if not records:
+            raise PubMedError(f"No article found in PubMed response for {record_id}")
+
+        return records[0]
 
     async def search(self, query: str, limit: int = 10) -> list[KnowledgeRecord]:
         try:
@@ -46,83 +52,162 @@ class PubMedClient(KnowledgeClient):
                 },
             )
 
-            ids = response.json().get(
-                "esearchresult",
-                {},
-            ).get(
-                "idlist",
-                [],
-            )
+            ids = response.json().get("esearchresult", {}).get("idlist", [])
 
         except Exception as exc:
-            raise KnowledgeError(
+            raise PubMedError(
                 f"PubMed search failed for {query!r}: {exc}"
             ) from exc
 
-        records: list[KnowledgeRecord] = []
+        if not ids:
+            return []
 
-        for pmid in ids[:limit]:
-            try:
-                records.append(await self.fetch(pmid))
-            except KnowledgeError:
-                continue
+        try:
+            response = await self._request(
+                "GET",
+                "/efetch.fcgi",
+                params={
+                    "db": "pubmed",
+                    "id": ",".join(ids[:limit]),
+                    "rettype": "abstract",
+                    "retmode": "xml",
+                },
+            )
 
-        return records
+            return self._parse_articles(response.text)
 
-    def _parse_xml(self, xml_text: str, pmid: str) -> KnowledgeRecord:
-        """Parse a PubMed XML response into a KnowledgeRecord."""
+        except Exception as exc:
+            raise PubMedError(
+                f"PubMed batch fetch failed: {exc}"
+            ) from exc
+
+    def _parse_articles(self, xml_text: str) -> list[KnowledgeRecord]:
         try:
             root = ET.fromstring(xml_text)
         except ET.ParseError as exc:
-            raise KnowledgeError(f"Failed to parse PubMed XML for {pmid}: {exc}") from exc
+            raise PubMedError(f"Failed to parse PubMed XML: {exc}") from exc
 
-        article = root.find(".//PubmedArticle/MedlineCitation/Article")
-        if article is None:
-            raise KnowledgeError(f"No article found in PubMed response for {pmid}")
+        records: list[KnowledgeRecord] = []
 
-        title_el = article.find("ArticleTitle")
-        title = (title_el.text or "").strip() if title_el is not None else "(no title)"
+        for article_node in root.findall(".//PubmedArticle"):
 
-        abstract_parts: list[str] = []
-        for at in article.findall(".//Abstract/AbstractText"):
-            label = at.get("Label")
-            text = "".join(at.itertext()).strip()
-            if label:
-                abstract_parts.append(f"{label}: {text}")
-            else:
-                abstract_parts.append(text)
-        abstract = " ".join(abstract_parts) or "(no abstract available)"
+            citation = article_node.find("MedlineCitation")
+            article = citation.find("Article") if citation is not None else None
 
-        authors: list[str] = []
-        for author in article.findall(".//AuthorList/Author"):
-            last = author.find("LastName")
-            init = author.find("Initials")
-            if last is not None:
-                name = last.text or ""
-                if init is not None and init.text:
-                    name = f"{name} {init.text}"
-                authors.append(name)
-        authors_str = ", ".join(authors[:6]) + (" et al." if len(authors) > 6 else "")
+            if citation is None or article is None:
+                continue
 
-        journal_el = article.find(".//Journal/Title")
-        journal = (journal_el.text or "").strip() if journal_el is not None else ""
+            pmid = citation.findtext("PMID", "").strip()
 
-        year_el = article.find(".//PubDate/Year")
-        year = (year_el.text or "").strip() if year_el is not None else ""
+            title = article.findtext("ArticleTitle", "").strip() or "(no title)"
 
-        return KnowledgeRecord(
-            source=self.source,
-            source_id=pmid,
-            title=title,
-            content=abstract,
-            uri=f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
-            metadata={
-                "pmid": pmid,
-                "authors": authors_str,
-                "journal": journal,
-                "year": year,
-            },
-        )
+            abstract_parts: list[str] = []
+
+            for abstract in article.findall(".//Abstract/AbstractText"):
+                label = abstract.get("Label")
+                text = "".join(abstract.itertext()).strip()
+
+                if not text:
+                    continue
+
+                if label:
+                    abstract_parts.append(f"{label}: {text}")
+                else:
+                    abstract_parts.append(text)
+
+            abstract_text = " ".join(abstract_parts) or "(no abstract available)"
+
+            authors = []
+
+            for author in article.findall(".//AuthorList/Author"):
+                last = author.findtext("LastName", "")
+                initials = author.findtext("Initials", "")
+
+                if last:
+                    authors.append(
+                        f"{last} {initials}".strip()
+                    )
+
+            authors_str = ", ".join(authors[:6])
+
+            if len(authors) > 6:
+                authors_str += " et al."
+
+            journal = article.findtext(".//Journal/Title", "").strip()
+
+            year = article.findtext(".//PubDate/Year", "").strip()
+
+            volume = article.findtext(".//JournalIssue/Volume", "").strip()
+
+            issue = article.findtext(".//JournalIssue/Issue", "").strip()
+
+            pages = article.findtext(".//Pagination/MedlinePgn", "").strip()
+
+            language = article.findtext("Language", "").strip()
+
+            doi = ""
+
+            pmcid = ""
+
+            for article_id in article_node.findall(".//PubmedData/ArticleIdList/ArticleId"):
+
+                id_type = article_id.attrib.get("IdType", "").lower()
+
+                value = (article_id.text or "").strip()
+
+                if id_type == "doi":
+                    doi = value
+
+                elif id_type == "pmc":
+                    pmcid = value
+
+            mesh_terms = [
+                mesh.findtext("DescriptorName", "").strip()
+                for mesh in citation.findall(".//MeshHeading")
+                if mesh.find("DescriptorName") is not None
+            ]
+
+            publication_types = [
+                pt.text.strip()
+                for pt in article.findall(".//PublicationType")
+                if pt.text
+            ]
+
+            affiliations = []
+
+            for aff in article.findall(".//AffiliationInfo/Affiliation"):
+
+                text = "".join(aff.itertext()).strip()
+
+                if text and text not in affiliations:
+                    affiliations.append(text)
+
+            records.append(
+                KnowledgeRecord(
+                    source=self.source,
+                    source_id=pmid,
+                    title=title,
+                    content=abstract_text,
+                    uri=f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
+                    metadata={
+                        "pmid": pmid,
+                        "doi": doi,
+                        "pmcid": pmcid,
+                        "authors": authors_str,
+                        "journal": journal,
+                        "year": year,
+                        "volume": volume,
+                        "issue": issue,
+                        "pages": pages,
+                        "language": language,
+                        "mesh_terms": mesh_terms,
+                        "publication_types": publication_types,
+                        "affiliations": affiliations,
+                    },
+                )
+            )
+
+        return records
 
 
 __all__ = ["PubMedClient"]

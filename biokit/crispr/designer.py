@@ -45,7 +45,11 @@ def iter_guides(
 
 
 def score_guide(spacer: str, off_targets: int = 0) -> float:
-    """Score a guide; higher is better. Score in [0, 100]."""
+    """Score a guide; higher is better. Score range: [0, 60].
+
+    The ceiling is 60 (achieved when GC fraction is in [0.4, 0.7] and the
+    spacer contains no ``TTTT``); off-targets divide the GC score down.
+    """
     gc = gc_fraction(spacer)
     if 0.4 <= gc <= 0.7:
         gc_score = 60.0

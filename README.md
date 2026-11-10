@@ -2,8 +2,8 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-245%2B-brightgreen.svg)](#)
-[![Coverage](https://img.shields.io/badge/coverage-80%25%2B-brightgreen.svg)](#)
+[![Tests](https://img.shields.io/badge/tests-358%20passing-brightgreen.svg)](#)
+[![Coverage](https://img.shields.io/badge/coverage-75%25-brightgreen.svg)](#)
 
 **BioNexus** is a unified platform that pairs **BioKit 2.0** (deterministic
 bioinformatics) with **NEXUS Ω** (AI-native biological interpretation
@@ -98,7 +98,7 @@ bionexus nexus interpret --question "What does BRCA1 do?"
 bionexus nexus agents
 
 # Bridge commands
-bionexus programs                                          # list all 22+ BioKit programs
+bionexus programs                                          # list all 23 registered BioKit programs
 bionexus run gc_content --inputs '{"sequence": "ATGGCAGGT"}'
 bionexus run find_orfs --inputs '{"sequence": "ATGGCAGGTGACCCGTGA", "minimum_length": 6}'
 bionexus version
@@ -108,10 +108,10 @@ bionexus version
 
 ### BioKit 2.0 (deterministic substrate)
 
-22 subpackages: `sequence`, `io`, `alignment`, `assembly`, `annotation`,
+23 subpackages: `sequence`, `io`, `alignment`, `assembly`, `annotation`,
 `orf`, `translation`, `codon`, `kmers`, `motifs`, `blast`, `primer`, `rna`,
 `structural`, `popgen`, `crispr`, `machine_learning`, `phylogeny`,
-`restriction`, `visualization`, `statistics`, `models`.
+`restriction`, `visualization`, `statistics`, `models`, `utils`.
 
 ### NEXUS (AI interpretation layer)
 

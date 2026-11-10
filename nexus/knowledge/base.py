@@ -1,4 +1,4 @@
-﻿"""Base classes for knowledge source clients.
+"""Base classes for knowledge source clients.
 
 A :class:`KnowledgeSource` is a tag enum identifying the source
 (PubMed, UniProt, etc.). A :class:`KnowledgeClient` is a typed HTTP
@@ -18,6 +18,7 @@ from typing import Any
 import httpx
 
 from nexus.rag.indexing import Document
+from nexus.core.exceptions import KnowledgeError
 
 
 class KnowledgeSource(str, Enum):
@@ -27,10 +28,6 @@ class KnowledgeSource(str, Enum):
     PDB = "pdb"
     ENSEMBL = "ensembl"
     GO = "go"
-
-
-class KnowledgeError(Exception):
-    """Base class for knowledge client errors."""
 
 
 @dataclass(frozen=True)

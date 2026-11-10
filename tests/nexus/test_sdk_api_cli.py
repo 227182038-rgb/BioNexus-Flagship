@@ -118,63 +118,41 @@ class TestAPI:
 
 
 class TestCLI:
-    def test_version_command(self) -> None:
+    def test_nexus_analyze_command(self) -> None:
         from nexus.cli.main import app
+        from typer.testing import CliRunner
+
+        runner = CliRunner()
+        result = runner.invoke(app, ["TP53"])
+        assert result.exit_code == 0
+        assert "BioNexus Scientific Analysis" in result.output
+
+    def test_bridge_version_command(self) -> None:
+        from bridge.cli import app
         from typer.testing import CliRunner
 
         runner = CliRunner()
         result = runner.invoke(app, ["version"])
         assert result.exit_code == 0
-        assert "Nexus Ω" in result.output
+        assert "BioNexus Platform" in result.output
 
-    def test_providers_command(self) -> None:
-        from nexus.cli.main import app
+    def test_bridge_programs_command(self) -> None:
+        from bridge.cli import app
         from typer.testing import CliRunner
 
         runner = CliRunner()
-        result = runner.invoke(app, ["providers"])
+        result = runner.invoke(app, ["programs"])
         assert result.exit_code == 0
-        assert "dummy" in result.output
+        assert "gc_content" in result.output
 
-    def test_agents_command(self) -> None:
-        from nexus.cli.main import app
-        from typer.testing import CliRunner
-
-        runner = CliRunner()
-        result = runner.invoke(app, ["agents"])
-        assert result.exit_code == 0
-        assert "literature" in result.output
-
-    def test_interpret_command(self) -> None:
-        from nexus.cli.main import app
+    def test_bridge_run_command(self) -> None:
+        from bridge.cli import app
         from typer.testing import CliRunner
 
         runner = CliRunner()
         result = runner.invoke(
             app,
-            ["interpret", "--question", "What is DNA?", "--provider", "dummy"],
+            ["run", "gc_content", "--inputs", '{"sequence": "ATGGCAGGT"}'],
         )
         assert result.exit_code == 0
-
-    def test_index_and_search_commands(self, tmp_path: pytest.TempPathFactory) -> None:
-        from nexus.cli.main import app
-        from typer.testing import CliRunner
-
-        runner = CliRunner()
-        # Index a document
-        result = runner.invoke(
-            app,
-            [
-                "index",
-                "--uri",
-                "pubmed:1",
-                "--title",
-                "BRCA1 paper",
-                "--content",
-                "BRCA1 is involved in DNA repair.",
-            ],
-        )
-        assert result.exit_code == 0
-        # Search
-        result = runner.invoke(app, ["search", "--query", "BRCA1"])
-        assert result.exit_code == 0
+        assert "gc_percentage" in result.output

@@ -40,3 +40,13 @@ site/
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Logs
+logs/
+*.log
+
+# Backups
+*.bak
+
+# Local model runners / tools
+.lmstudio/

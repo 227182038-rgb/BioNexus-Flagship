@@ -7,10 +7,11 @@ reference.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Protocol, TypeVar, runtime_checkable
 
 # Re-exported for convenience.
-PathLike = "_PathLike[str] | str"
+PathLike = str | Path  # repo convention, see biokit/utils/io_utils.py
 
 # A nucleotide or protein sequence. We keep this as ``str`` rather than a
 # custom class because Biopython and the wider ecosystem use ``str``.

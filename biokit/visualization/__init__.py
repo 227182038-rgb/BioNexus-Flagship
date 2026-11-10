@@ -1,4 +1,4 @@
-"""Visualization: matplotlib plots and GenomeDiagram."""
+"""Visualization: matplotlib plots (GenomeDiagram is not implemented)."""
 
 from __future__ import annotations
 

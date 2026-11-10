@@ -32,11 +32,21 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from nexus.core.config import config
+from nexus.core.exceptions import ValidationError
 from nexus.core.types import Evidence, EvidenceClass
 
 
 class DeterministicBoundaryViolation(Exception):
     """Raised when an AI module attempts to modify deterministic BioKit output."""
+
+
+class ResourceLimitError(ValidationError):
+    """Raised when program inputs exceed the configured resource caps.
+
+    Subclasses :class:`~nexus.core.exceptions.ValidationError` so the API's
+    existing 400 handler rejects oversized requests without new plumbing.
+    """
 
 
 class BioKitProgram(Protocol):
@@ -153,6 +163,56 @@ def _canonical_fingerprint(prefix: str, payload: dict[str, Any]) -> str:
     return hashlib.sha256(f"{prefix}\x00{canonical}".encode()).hexdigest()
 
 
+def _iter_strings(value: Any) -> list[str]:
+    """Collect every string reachable in ``value`` (dicts, lists, tuples)."""
+    found: list[str] = []
+    if isinstance(value, str):
+        found.append(value)
+    elif isinstance(value, dict):
+        for v in value.values():
+            found.extend(_iter_strings(v))
+    elif isinstance(value, (list, tuple)):
+        for v in value:
+            found.extend(_iter_strings(v))
+    return found
+
+
+def _check_resource_limits(program: str, inputs: dict[str, Any]) -> None:
+    """Reject inputs that exceed ``config.resources`` before dispatch.
+
+    Raises
+    ------
+    ResourceLimitError
+        If any string input exceeds ``max_sequence_length``, the whole
+        payload exceeds ``max_payload_bytes``, or a pairwise-alignment
+        program is asked for more than ``max_dp_cells`` O(n·m) cells.
+    """
+    import json
+
+    limits = config.resources
+    payload = json.dumps(inputs, sort_keys=True, default=str)
+    if len(payload.encode("utf-8", errors="replace")) > limits.max_payload_bytes:
+        raise ResourceLimitError(
+            f"inputs payload exceeds max_payload_bytes "
+            f"({limits.max_payload_bytes}); program not started"
+        )
+    strings = _iter_strings(inputs)
+    for s in strings:
+        if len(s) > limits.max_sequence_length:
+            raise ResourceLimitError(
+                f"input string length {len(s)} exceeds max_sequence_length "
+                f"({limits.max_sequence_length}); program not started"
+            )
+    if program in InProcessBioKit._O_NM_PROGRAMS and len(strings) >= 2:
+        longest = sorted((len(s) for s in strings), reverse=True)[:2]
+        cells = longest[0] * longest[1]
+        if cells > limits.max_dp_cells:
+            raise ResourceLimitError(
+                f"program {program!r} would need {cells} DP cells, exceeding "
+                f"max_dp_cells ({limits.max_dp_cells}); program not started"
+            )
+
+
 class InProcessBioKit(BioKit):
     """Default in-process BioKit implementation.
 
@@ -162,7 +222,18 @@ class InProcessBioKit(BioKit):
     Production deployments should use a BioKit implementation that
     pins dependencies, model weights, and environment hashes (see the
     Critical Review §8.1).
+
+    Resource caps (``config.resources``) are enforced here, BEFORE the
+    program runs: sequence length, aggregate payload size, and the O(n·m)
+    cell budget of pairwise-alignment programs.  Documented limitation:
+    programs execute synchronously on the calling thread, so an in-flight
+    invocation cannot be cancelled from another thread — the caps bound what
+    a new invocation may START, and no timeout interrupts a running one (the
+    worker thread finishes its current work regardless).
     """
+
+    # Programs whose cost is O(n·m) in their two longest string inputs.
+    _O_NM_PROGRAMS = frozenset({"gotoh", "needleman_wunsch", "smith_waterman"})
 
     def __init__(self) -> None:
         self._programs: dict[str, BioKitProgram] = {}
@@ -175,6 +246,7 @@ class InProcessBioKit(BioKit):
     def run(self, program: str, inputs: dict[str, Any]) -> BioKitOutput:
         if program not in self._programs:
             raise KeyError(f"BioKit program {program!r} not registered")
+        _check_resource_limits(program, inputs)
         inputs_fp = _canonical_fingerprint("inputs", inputs)
         outputs = self._programs[program].run(inputs)
         if not isinstance(outputs, dict):
@@ -199,4 +271,5 @@ __all__ = [
     "BioKitProgram",
     "DeterministicBoundaryViolation",
     "InProcessBioKit",
+    "ResourceLimitError",
 ]

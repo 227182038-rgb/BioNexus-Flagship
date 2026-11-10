@@ -83,6 +83,12 @@ class ProviderRegistry:
             if env_var:
                 api_key = os.environ.get(env_var)
 
+        if base_url is None and key == "openai":
+            base_url = os.environ.get("OPENAI_BASE_URL") or os.environ.get("LMSTUDIO_BASE_URL")
+
+        if key == "openai" and base_url and not api_key:
+            api_key = "lm-studio"
+
         instance = cls(model=model, api_key=api_key, base_url=base_url, **kwargs)
         # All registered classes conform to the LLMProvider protocol.
         return cast(LLMProvider, instance)

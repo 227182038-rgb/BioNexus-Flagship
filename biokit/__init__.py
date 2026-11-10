@@ -19,9 +19,9 @@ Public modules:
 * :mod:`biokit.popgen` — HWE, F_ST, linkage disequilibrium
 * :mod:`biokit.crispr` — sgRNA design, off-target search
 * :mod:`biokit.machine_learning` — classifiers, clustering, encoders
-* :mod:`biokit.phylogeny` — UPGMA, neighbor-joining, Robinson-Foulds
+* :mod:`biokit.phylogeny` — UPGMA, Robinson-Foulds (neighbor-joining is not implemented)
 * :mod:`biokit.restriction` — restriction enzyme analysis
-* :mod:`biokit.visualization` — matplotlib plots, GenomeDiagram
+* :mod:`biokit.visualization` — matplotlib plots (GenomeDiagram is not implemented)
 * :mod:`biokit.statistics` — sequence composition, distributions
 
 For the command-line interface run ``biokit --help``.

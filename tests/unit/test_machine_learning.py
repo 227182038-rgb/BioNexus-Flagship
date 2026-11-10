@@ -57,6 +57,20 @@ class TestPCA:
         X2 = PCA(n_components=2).fit_transform(X)
         assert X2.shape == (3, 2)
 
+    def test_ratio_is_share_of_total_variance_regression(self):
+        """Regression for lead L-11a.
+
+        ``explained_variance_ratio`` must express each selected PC as a
+        fraction of the TOTAL data variance (sklearn ``PCA`` semantics),
+        not as a share of the *selected* components' variance.
+        """
+        rng = np.random.default_rng(42)
+        X = rng.normal(size=(60, 5))
+        full = PCA(n_components=5).fit(X).explained_variance_ratio
+        partial = PCA(n_components=2).fit(X).explained_variance_ratio
+        assert partial[0] == pytest.approx(full[0])  # truth: ~0.28, was [1.0]
+        assert abs(partial.sum()) < 1.0  # 2 of 5 components < 100% of total
+
     def test_transform_before_fit_raises(self):
         with pytest.raises(NotFittedError):
             PCA().transform(np.array([[0.0, 0.0]]))
